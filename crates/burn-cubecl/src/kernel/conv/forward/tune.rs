@@ -9,7 +9,7 @@ use cubek::convolution::{AcceleratedTileKind, DepthwiseStrategy, DepthwiseTiling
 use crate::{
     CubeAutotuneKey, CubeTuneId,
     kernel::conv::{
-        ConvAutotuneKey, conv_direct, conv_im2col_1x1, forward::depthwise::conv_depthwise,
+        ConvAutotuneKey, conv_direct, conv_im2col, conv_im2col_1x1, forward::depthwise::conv_depthwise,
         forward::implicit_gemm::*,
     },
     tensor::CubeTensor,
@@ -141,6 +141,12 @@ pub fn conv_autotune<const N: usize>(
                 |(input, weight, bias, options)| {
                     conv_gemm_simple_tma(input, weight, bias, options, AcceleratedTileKind::Mma)
                 },
+            ))
+            // Last: `autotune-checks` compares every route's output against the last one's, and the
+            // routes above need matrix-multiply instructions a WGSL device does not have.
+            .with(Tunable::new(
+                "conv_im2col",
+                |(input, weight, bias, options)| conv_im2col::<N>(input, weight, bias, options),
             ))
     });
 

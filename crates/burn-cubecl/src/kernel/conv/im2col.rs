@@ -18,7 +18,7 @@ use cubek::convolution::components::ConvSetupError;
 use crate::{
     CubeDevice,
     kernel::{
-        AddOp, into_contiguous_aligned, launch_binop,
+        AddOp, into_contiguous, into_contiguous_aligned, launch_binop,
         matmul::{MatmulStrategy, matmul},
         reduce::{KernelReduceStrategy, reduce_dim},
         slice_assign, slice_with_steps,
@@ -896,4 +896,226 @@ pub fn wgrad_im2col<const N: usize>(
     // `[c_out, ..kernel * c_in]` -> `[c_out, ..kernel, c_in]`, which is the
     // order the columns were laid out in.
     Ok(reshape(grad, weight_shape))
+}
+
+/// The most column elements one block of [`conv_im2col`] lays out: 256 MiB of `f32`, well under the
+/// buffer a browser's WebGPU device binds.
+const IM2COL_BLOCK_ELEMENTS: usize = 1 << 26;
+
+/// A dense N-dimensional convolution as columns and one matmul per block of output rows: each output
+/// position's input taps are gathered into a row of columns, `[kernel..., in]` in the weight's order,
+/// and multiplied by the weight. Unlike [`im2col`], which materialises every tap at once for the
+/// gradients, a block holds at most `IM2COL_BLOCK_ELEMENTS` column elements, its rows taken along the
+/// first spatial axis, and one kernel gathers all of a row's taps.
+pub fn conv_im2col<const N: usize>(
+    input: CubeTensor,
+    weight: CubeTensor,
+    bias: Option<CubeTensor>,
+    options: ConvOptions<N>,
+) -> Result<CubeTensor, ConvSetupError> {
+    if options.groups != 1 {
+        return Err(ConvSetupError::Groups(options.groups));
+    }
+
+    let rank = input.meta.num_dims();
+    let dim_c = rank - 1;
+    let dtype = input.dtype;
+    let (client, device) = (input.client.clone(), input.device.clone());
+
+    let batch_size = input.meta.shape()[0];
+    let in_channels = input.meta.shape()[dim_c];
+    let out_channels = weight.meta.shape()[0];
+    let kernel_shape = weight.meta.shape()[1..dim_c].to_vec();
+    let out_shape = calculate_conv_output_sizes(
+        &kernel_shape,
+        &options.stride,
+        &options.padding,
+        &options.dilation,
+        &input.meta.shape()[1..dim_c],
+    );
+
+    let taps = kernel_shape.iter().product::<usize>() * in_channels;
+    let row: usize = out_shape[1..].iter().product();
+    let budget = Ord::min(
+        IM2COL_BLOCK_ELEMENTS,
+        client.properties().memory.max_page_size as usize / dtype.size(),
+    );
+
+    // [out, kernel..., in] as [out, K], then [K, out] as the columns multiply it.
+    let weight = reshape(into_contiguous(weight), Shape::new([out_channels, taps]));
+    let weight = swap_dims(weight, 0, 1);
+
+    let mut out_dims = vec![batch_size];
+    out_dims.extend(out_shape.iter().copied());
+    out_dims.push(out_channels);
+
+    // One block for the whole batch when its columns fit, else blocks of rows within each batch entry.
+    let blocks: Vec<[usize; 4]> = if batch_size * out_shape[0] * row * taps <= budget {
+        vec![[0, batch_size, 0, out_shape[0]]]
+    } else {
+        let out_rows = out_shape[0];
+        let rows = (budget / (row * taps)).clamp(1, out_rows);
+        (0..batch_size)
+            .flat_map(|b| {
+                (0..out_rows)
+                    .step_by(rows)
+                    .map(move |r| [b, 1, r, Ord::min(rows, out_rows - r)])
+            })
+            .collect()
+    };
+
+    let mut output = (blocks.len() > 1).then(|| {
+        empty_device_dtype(
+            client.clone(),
+            device.clone(),
+            out_dims.clone().into(),
+            dtype,
+        )
+    });
+    let pad = options.padding_begin();
+
+    for [b, batches, r, rows] in blocks {
+        let mut block_dims = vec![batches, rows];
+        block_dims.extend(out_shape[1..].iter().copied());
+        let positions: usize = block_dims.iter().product();
+
+        let columns = empty_device_dtype(
+            client.clone(),
+            device.clone(),
+            Shape::new([positions, taps]),
+            dtype,
+        );
+        let mut block_shape = SequenceArg::new();
+        block_dims.iter().for_each(|dim| block_shape.push(*dim));
+        let mut kernel = SequenceArg::new();
+        let mut stride = SequenceArg::new();
+        let mut padding = SequenceArg::new();
+        let mut dilation = SequenceArg::new();
+        for axis in 0..N {
+            kernel.push(kernel_shape[axis]);
+            stride.push(options.stride[axis]);
+            padding.push(pad[axis]);
+            dilation.push(options.dilation[axis]);
+        }
+
+        let cube_dim = CubeDim::new(&client, positions);
+        let cube_count = calculate_cube_count_elemwise(&client, positions, cube_dim);
+        unsafe {
+            im2col_rows_kernel::launch_unchecked(
+                &client,
+                cube_count,
+                cube_dim,
+                address_type!(input, columns),
+                input.clone().into_tensor_arg(),
+                columns.clone().into_linear_view(),
+                block_shape,
+                kernel,
+                stride,
+                padding,
+                dilation,
+                b,
+                r,
+                positions,
+                taps,
+                dtype_to_storage_type(dtype),
+            )
+        };
+
+        let block = matmul(
+            columns,
+            weight.clone(),
+            None,
+            MatmulStrategy::default(),
+            dtype,
+        )?;
+        let block = split_dim(block, 0, &block_dims);
+        output = Some(match output {
+            None => block,
+            Some(output) => {
+                let mut indices = vec![Slice::from(b..b + batches), Slice::from(r..r + rows)];
+                indices.extend(out_shape[1..].iter().map(|dim| Slice::from(0..*dim)));
+                slice_assign(output, &indices, block)
+            }
+        });
+    }
+
+    let mut out = output.expect("at least one block");
+    if let Some(bias) = bias {
+        let mut bias_shape = iter::repeat_n(1, rank - 1).collect::<Vec<_>>();
+        bias_shape.push(out_channels);
+        let bias = reshape(bias, bias_shape.into());
+        out = launch_binop::<AddOp>(out, bias);
+    }
+
+    Ok(out)
+}
+
+/// Writes the columns of one output position of a block, `[batch, rows, ..]` from batch entry
+/// `batch_offset` and output row `row_offset`: its row of columns starts at `ABSOLUTE_POS * taps`, the
+/// taps in the weight's `[kernel..., in]` order, zero where a tap reads outside the input.
+#[cube(launch_unchecked, address_type = "dynamic")]
+fn im2col_rows_kernel<E: Numeric>(
+    input: &Tensor<E>,
+    mut columns: LinearViewMut<'_, E>,
+    block_shape: Sequence<FastDivmod<usize>>,
+    kernel: Sequence<usize>,
+    stride: Sequence<usize>,
+    pad: Sequence<usize>,
+    dilation: Sequence<usize>,
+    batch_offset: usize,
+    row_offset: usize,
+    positions: usize,
+    taps: usize,
+    #[define(E)] _dtype: ElemType,
+) {
+    if ABSOLUTE_POS >= positions {
+        terminate!();
+    }
+
+    let spatial = comptime![kernel.len()];
+    let (_, pos) = decompose_linear(ABSOLUTE_POS, &block_shape);
+    let channels = input.shape(spatial + 1);
+    let channel_stride = input.stride(spatial + 1);
+    let base = (pos[0] + batch_offset) * input.stride(0);
+    let start = ABSOLUTE_POS * taps;
+    let kernel_taps = taps / channels;
+
+    for tap in 0..kernel_taps {
+        let mut offset = base;
+        let mut inside = true;
+
+        #[unroll]
+        for axis in 0..spatial {
+            let mut divisor = 1;
+            #[unroll]
+            for later in 0..spatial {
+                if later > axis {
+                    divisor *= kernel[later];
+                }
+            }
+            let k = (tap / divisor) % kernel[axis];
+            let mut out = pos[axis + 1];
+            if comptime![axis == 0] {
+                out += row_offset;
+            }
+            // Where the tap reads, `pad[axis]` past the input's first pixel.
+            let at = out * stride[axis] + k * dilation[axis];
+            let fits = at >= pad[axis] && at - pad[axis] < input.shape(axis + 1);
+            inside = inside && fits;
+            if fits {
+                offset += (at - pad[axis]) * input.stride(axis + 1);
+            }
+        }
+
+        let row = start + tap * channels;
+        if inside {
+            for c in 0..channels {
+                columns.write(row + c, input[offset + c * channel_stride]);
+            }
+        } else {
+            for c in 0..channels {
+                columns.write(row + c, E::from_int(0));
+            }
+        }
+    }
 }
