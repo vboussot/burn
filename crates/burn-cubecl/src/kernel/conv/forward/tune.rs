@@ -9,8 +9,8 @@ use cubek::convolution::{AcceleratedTileKind, DepthwiseStrategy, DepthwiseTiling
 use crate::{
     CubeAutotuneKey, CubeTuneId,
     kernel::conv::{
-        ConvAutotuneKey, conv_direct, conv_im2col_1x1, forward::depthwise::conv_depthwise,
-        forward::implicit_gemm::*,
+        ConvAutotuneKey, conv_direct, conv_im2col_1x1, conv_winograd,
+        forward::depthwise::conv_depthwise, forward::implicit_gemm::*,
     },
     tensor::CubeTensor,
 };
@@ -63,6 +63,18 @@ pub fn conv_autotune<const N: usize>(
             .with(Tunable::new(
                 "conv_direct",
                 |(input, weight, bias, options)| conv_direct::<N>(input, weight, bias, options),
+            ))
+            .with(Tunable::new(
+                "conv_winograd_f2",
+                |(input, weight, bias, options)| {
+                    conv_winograd::<N>(input, weight, bias, options, 2)
+                },
+            ))
+            .with(Tunable::new(
+                "conv_winograd_f4",
+                |(input, weight, bias, options)| {
+                    conv_winograd::<N>(input, weight, bias, options, 4)
+                },
             ))
             // Declines with `NotDepthwise` on anything that is not one filter per channel, so
             // each of these costs a dense shape nothing but the setup call that rejects it.
