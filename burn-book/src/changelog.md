@@ -79,6 +79,10 @@ positions when sequence lengths differ.
 
 #### Kernels
 
+- Add Winograd routes to the CubeCL convolution autotune for 3x3 and 3x3x3 convolutions of stride
+  and dilation one with same padding (F(2, 3) and F(4, 3)), and 5x5 and 5x5x5 ones (F(2, 5)). On
+  WebGPU, where the direct kernel is the only route for these shapes, a 3x3x3 convolution runs 6
+  to 50 times faster. [@vboussot](https://github.com/vboussot)
 - Avoid a full-sized gradient copy in CubeCL FP32 `conv2d` bias backward, while retaining
   single-pass accumulation for FP16/BF16 to avoid intermediate overflow.
   ([#6173](https://github.com/tracel-ai/burn/pull/6173))

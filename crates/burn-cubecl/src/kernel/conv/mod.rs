@@ -10,6 +10,9 @@ mod forward;
 mod im2col;
 
 mod tune_key;
+mod winograd;
+#[cfg(all(test, any(feature = "cuda", feature = "wgpu")))]
+mod winograd_tests;
 
 pub(crate) use backward_data::*;
 pub(crate) use conv_transpose2d::*;
@@ -18,6 +21,7 @@ pub(crate) use deform_conv_transpose2d::*;
 pub(crate) use deform_conv2d::*;
 pub(crate) use direct::*;
 pub(crate) use im2col::*;
+pub(crate) use winograd::*;
 
 pub use base::*;
 pub use conv_transpose2d::{ConvTranspose2dStrategy, conv_transpose2d};
