@@ -1,7 +1,7 @@
 use super::*;
 use burn_tensor::Tolerance;
 use burn_tensor::ops::ConvOptions;
-use burn_tensor::{Distribution, module};
+use burn_tensor::{Distribution, FloatDType, module};
 
 #[test]
 fn conv2d_should_match_reference_backend() {
@@ -146,6 +146,64 @@ fn conv2d_should_match_reference_backend_bias_regression() {
     output
         .into_data()
         .assert_approx_eq::<FloatElem>(&output_ref.into_data(), tolerance);
+}
+
+// A 3x3 convolution of padding one over odd extents and more tiles than one block transforms.
+#[test]
+fn conv2d_same_padding_on_odd_extents_over_several_blocks_should_match_reference_backend() {
+    let device = Default::default();
+    let ref_device = ReferenceDevice::new();
+
+    let input = TestTensor::<4>::random([3, 64, 1027, 517], Distribution::Default, &device);
+    let weight = TestTensor::<4>::random([2, 64, 3, 3], Distribution::Default, &device);
+    let bias = TestTensor::<1>::random([2], Distribution::Default, &device);
+
+    let input_ref = TestTensor::<4>::from_data(input.to_data(), &ref_device);
+    let weight_ref = TestTensor::<4>::from_data(weight.to_data(), &ref_device);
+    let bias_ref = TestTensor::<1>::from_data(bias.to_data(), &ref_device);
+
+    let options = ConvOptions::new([1, 1], [1, 1], [1, 1], 1);
+
+    let output = module::conv2d(input, weight, Some(bias), options.clone());
+    let output_ref = module::conv2d(input_ref, weight_ref, Some(bias_ref), options);
+
+    assert_eq!(output.dims(), [3, 2, 1027, 517]);
+    output
+        .into_data()
+        .assert_approx_eq::<FloatElem>(&output_ref.into_data(), Tolerance::default());
+}
+
+// A half-precision 3x3 convolution of padding one against the reference convolving, in float32,
+// the values half precision holds (see the conv3d twin for the tolerance).
+#[test]
+fn conv2d_same_in_half_precision_should_match_reference_backend() {
+    let device = Default::default();
+    let ref_device = ReferenceDevice::new();
+    let half = |tensor: TestTensor<4>| tensor.cast(FloatDType::F16);
+    let input = half(TestTensor::random([2, 64, 96, 96], Distribution::Uniform(-1., 1.), &device));
+    let weight = half(TestTensor::random(
+        [64, 64, 3, 3],
+        Distribution::Uniform(-0.05, 0.05),
+        &device,
+    ));
+    let bias = TestTensor::<1>::random([64], Distribution::Uniform(-0.1, 0.1), &device)
+        .cast(FloatDType::F16);
+
+    let full = |tensor: &TestTensor<4>| tensor.clone().cast(FloatDType::F32).to_data();
+    let input_ref = TestTensor::<4>::from_data(full(&input), &ref_device);
+    let weight_ref = TestTensor::<4>::from_data(full(&weight), &ref_device);
+    let bias_ref =
+        TestTensor::<1>::from_data(bias.clone().cast(FloatDType::F32).to_data(), &ref_device);
+
+    let options = ConvOptions::new([1, 1], [1, 1], [1, 1], 1);
+
+    let output = module::conv2d(input, weight, Some(bias), options.clone());
+    let output_ref = module::conv2d(input_ref, weight_ref, Some(bias_ref), options);
+
+    output
+        .cast(FloatDType::F32)
+        .into_data()
+        .assert_approx_eq::<f32>(&output_ref.into_data(), Tolerance::rel_abs(1e-3, 5e-4));
 }
 
 #[test]
@@ -424,6 +482,31 @@ fn conv2d_strided_1x1_should_match_reference_backend() {
     let output = module::conv2d(input, weight, None, options.clone());
     let output_ref = module::conv2d(input_ref, weight_ref, None, options);
 
+    output
+        .into_data()
+        .assert_approx_eq::<FloatElem>(&output_ref.into_data(), Tolerance::default());
+}
+
+// A 5x5 convolution of padding two: the Winograd route at a tile of two on five taps.
+#[test]
+fn conv2d_five_taps_same_padding_should_match_reference_backend() {
+    let device = Default::default();
+    let ref_device = ReferenceDevice::new();
+
+    let input = TestTensor::<4>::random([2, 16, 129, 67], Distribution::Default, &device);
+    let weight = TestTensor::<4>::random([8, 16, 5, 5], Distribution::Default, &device);
+    let bias = TestTensor::<1>::random([8], Distribution::Default, &device);
+
+    let input_ref = TestTensor::<4>::from_data(input.to_data(), &ref_device);
+    let weight_ref = TestTensor::<4>::from_data(weight.to_data(), &ref_device);
+    let bias_ref = TestTensor::<1>::from_data(bias.to_data(), &ref_device);
+
+    let options = ConvOptions::new([1, 1], [2, 2], [1, 1], 1);
+
+    let output = module::conv2d(input, weight, Some(bias), options.clone());
+    let output_ref = module::conv2d(input_ref, weight_ref, Some(bias_ref), options);
+
+    assert_eq!(output.dims(), [2, 8, 129, 67]);
     output
         .into_data()
         .assert_approx_eq::<FloatElem>(&output_ref.into_data(), Tolerance::default());
