@@ -1,6 +1,7 @@
 pub use super::*;
 
 mod avg_pool2d;
+mod batch_of_slices;
 mod bernoulli;
 mod broadcast;
 mod cast;
