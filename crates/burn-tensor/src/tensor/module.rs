@@ -8,9 +8,66 @@ use crate::{
     kind::Basic,
     ops::{
         AttentionModuleOptions, AvgPoolOptions, BridgeTensor, ConvOptions, ConvTransposeOptions,
-        DeformConvOptions, InterpolateOptions, MaxPoolOptions, PadMode, UnfoldOptions,
+        DeformConvOptions, InterpolateMode, InterpolateOptions, MaxPoolOptions, PadMode,
+        UnfoldOptions,
     },
 };
+
+/// Resizes the three spatial axes of `x`, `[batch, channels, depth, height, width]`, to
+/// `output_size`, one axis after the other: `Nearest` takes the floor of the scaled coordinate,
+/// `Bilinear` blends the two neighbours along each axis (trilinear), corners aligned or half-pixel
+/// as `options.align_corners` says. `options.output_size` and `scale_factor` are not read.
+///
+/// # Panics
+///
+/// On any other mode.
+pub fn interpolate3d(x: Tensor<5>, output_size: [usize; 3], options: InterpolateOptions) -> Tensor<5> {
+    let device = x.device();
+    let shape = x.dims();
+    let index = |values: Vec<i64>| {
+        let count = values.len();
+        Tensor::<1, Int>::from_data(crate::TensorData::new(values, [count]), &device)
+    };
+    let mut out = x;
+    for axis in 0..3 {
+        let (input, output) = (shape[2 + axis], output_size[axis]);
+        out = match options.mode {
+            InterpolateMode::Nearest => {
+                let ratio = input as f64 / output as f64;
+                let nearest = (0..output)
+                    .map(|i| ((i as f64 * ratio).floor() as usize).min(input - 1) as i64)
+                    .collect();
+                out.select(2 + axis, index(nearest))
+            }
+            InterpolateMode::Bilinear => {
+                let coordinate = |i: usize| -> f64 {
+                    if options.align_corners {
+                        i as f64 * (input - 1) as f64 / Ord::max(output - 1, 1) as f64
+                    } else {
+                        ((i as f64 + 0.5) * input as f64 / output as f64 - 0.5)
+                            .clamp(0.0, (input - 1) as f64)
+                    }
+                };
+                let coordinates: Vec<f64> = (0..output).map(coordinate).collect();
+                let low: Vec<i64> = coordinates.iter().map(|c| c.floor() as i64).collect();
+                let high: Vec<i64> = low.iter().map(|l| Ord::min(l + 1, input as i64 - 1)).collect();
+                let weight: Vec<f32> = (coordinates.iter().zip(&low))
+                    .map(|(c, l)| (c - *l as f64) as f32)
+                    .collect();
+                // The weight of the high neighbour, broadcast along the axis.
+                let mut weight_shape = [1; 5];
+                weight_shape[2 + axis] = output;
+                let weight = Tensor::<5>::from_data(crate::TensorData::new(weight, weight_shape), &device)
+                    .cast(out.dtype());
+                let low = out.clone().select(2 + axis, index(low));
+                let high = out.select(2 + axis, index(high));
+                low * (weight.ones_like() - weight.clone()) + high * weight
+            }
+            other => panic!("interpolate3d does not implement {other:?}"),
+        };
+    }
+    out
+}
 
 /// Applies Instance Normalization over every axis after the first two of `input`,
 /// `(x - mean) / sqrt(var + epsilon) * gamma + beta`: the statistics of each batch entry and
