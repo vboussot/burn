@@ -185,6 +185,67 @@ impl ModuleOps<Self> for NdArray {
         .into())
     }
 
+    // burn-ndarray is deprecated and has no 3D pooling kernel: burn-flex is the CPU backend that
+    // pools in three dimensions.
+    fn avg_pool3d(
+        _x: FloatTensor<Self>,
+        _kernel_size: [usize; 3],
+        _stride: [usize; 3],
+        _padding: [usize; 3],
+        _count_include_pad: bool,
+        _ceil_mode: bool,
+    ) -> FloatTensor<Self> {
+        unimplemented!("burn-ndarray has no 3D pooling; use burn-flex")
+    }
+
+    fn avg_pool3d_backward(
+        _x: FloatTensor<Self>,
+        _grad: FloatTensor<Self>,
+        _kernel_size: [usize; 3],
+        _stride: [usize; 3],
+        _padding: [usize; 3],
+        _count_include_pad: bool,
+        _ceil_mode: bool,
+    ) -> FloatTensor<Self> {
+        unimplemented!("burn-ndarray has no 3D pooling; use burn-flex")
+    }
+
+    fn max_pool3d(
+        _x: FloatTensor<Self>,
+        _kernel_size: [usize; 3],
+        _stride: [usize; 3],
+        _padding: [usize; 3],
+        _dilation: [usize; 3],
+        _ceil_mode: bool,
+    ) -> FloatTensor<Self> {
+        unimplemented!("burn-ndarray has no 3D pooling; use burn-flex")
+    }
+
+    fn max_pool3d_with_indices(
+        _x: FloatTensor<Self>,
+        _kernel_size: [usize; 3],
+        _stride: [usize; 3],
+        _padding: [usize; 3],
+        _dilation: [usize; 3],
+        _ceil_mode: bool,
+        _indices_dtype: IntDType,
+    ) -> burn_backend::ops::MaxPool3dWithIndices<Self> {
+        unimplemented!("burn-ndarray has no 3D pooling; use burn-flex")
+    }
+
+    fn max_pool3d_with_indices_backward(
+        _x: FloatTensor<Self>,
+        _kernel_size: [usize; 3],
+        _stride: [usize; 3],
+        _padding: [usize; 3],
+        _dilation: [usize; 3],
+        _ceil_mode: bool,
+        _output_grad: FloatTensor<Self>,
+        _indices: burn_backend::tensor::IntTensor<Self>,
+    ) -> burn_backend::ops::MaxPool3dBackward<Self> {
+        unimplemented!("burn-ndarray has no 3D pooling; use burn-flex")
+    }
+
     fn max_pool2d(
         x: FloatTensor<Self>,
         kernel_size: [usize; 2],
