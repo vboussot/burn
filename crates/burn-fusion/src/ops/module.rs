@@ -1674,6 +1674,44 @@ impl<B: FusionBackend> ModuleOps<Fusion<B>> for Fusion<B> {
             .output()
     }
 
+    fn instance_norm_statistics(
+        tensor: FloatTensor<Self>,
+        epsilon: f64,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+        make_ops!(
+            InstanceNormStatisticsOps,
+            InstanceNormStatisticsOpIr,
+            |args: &InstanceNormStatisticsOpIr, handles: &mut HandleContainer<B::Handle>| {
+                let input = handles.get_float_tensor::<B>(&args.input);
+                let (mean, denominator) =
+                    B::instance_norm_statistics(input, args.epsilon.elem());
+
+                handles.register_float_tensor::<B>(&args.out_mean.id, mean);
+                handles.register_float_tensor::<B>(&args.out_denominator.id, denominator);
+            }
+        );
+
+        let streams = StreamId::current();
+        let client = tensor.client.clone();
+        let input = tensor.into_ir();
+        let epsilon = ScalarIr::new(epsilon, &input.dtype);
+        let desc = InstanceNormStatisticsOpIr::create(
+            input,
+            epsilon,
+            || client.create_empty_handle(),
+        );
+
+        let [mean, denominator] = client
+            .register(
+                streams,
+                OperationIr::Module(ModuleOperationIr::InstanceNormStatistics(desc.clone())),
+                InstanceNormStatisticsOps::<B>::new(desc),
+            )
+            .outputs();
+
+        (mean, denominator)
+    }
+
     fn adaptive_avg_pool3d(x: FloatTensor<Self>, output_size: [usize; 3]) -> FloatTensor<Self> {
         make_ops!(
             AdaptiveAvgPool3dOps,

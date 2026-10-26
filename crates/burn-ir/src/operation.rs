@@ -328,6 +328,9 @@ pub enum ModuleOperationIr {
     /// [max pool 3d with indices](burn_backend::ops::ModuleOps::max_pool3d_with_indices).
     MaxPool3dWithIndices(MaxPool3dWithIndicesOpIr),
     /// Operation corresponding to
+    /// [instance_norm_statistics](burn_backend::ops::ModuleOps::instance_norm_statistics).
+    InstanceNormStatistics(InstanceNormStatisticsOpIr),
+    /// Operation corresponding to
     /// [max pool 3d with indices backward](burn_backend::ops::ModuleOps::max_pool3d_with_indices_backward).
     MaxPool3dWithIndicesBackward(MaxPool3dWithIndicesBackwardOpIr),
     /// Operation corresponding to [interpolate](burn_backend::ops::ModuleOps::interpolate).
@@ -2012,6 +2015,15 @@ pub struct MaxPool3dOpIr {
     pub dilation: [usize; 3],
     pub ceil_mode: bool,
     pub out: TensorIr,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
+pub struct InstanceNormStatisticsOpIr {
+    pub input: TensorIr,
+    pub epsilon: ScalarIr,
+    pub out_mean: TensorIr,
+    pub out_denominator: TensorIr,
 }
 
 #[allow(missing_docs)]
@@ -4039,6 +4051,7 @@ impl ModuleOperationIr {
             }
             ModuleOperationIr::MaxPool3d(repr) => Box::new([&repr.x].into_iter()),
             ModuleOperationIr::MaxPool3dWithIndices(repr) => Box::new([&repr.x].into_iter()),
+            ModuleOperationIr::InstanceNormStatistics(repr) => Box::new([&repr.input].into_iter()),
             ModuleOperationIr::MaxPool3dWithIndicesBackward(repr) => {
                 Box::new([&repr.x, &repr.indices, &repr.grad].into_iter())
             }
@@ -4192,6 +4205,9 @@ impl ModuleOperationIr {
             ModuleOperationIr::MaxPool3d(repr) => Box::new([&repr.out].into_iter()),
             ModuleOperationIr::MaxPool3dWithIndices(repr) => {
                 Box::new([&repr.out, &repr.out_indices].into_iter())
+            }
+            ModuleOperationIr::InstanceNormStatistics(repr) => {
+                Box::new([&repr.out_mean, &repr.out_denominator].into_iter())
             }
             ModuleOperationIr::MaxPool3dWithIndicesBackward(repr) => {
                 Box::new([&repr.out].into_iter())
@@ -4455,6 +4471,9 @@ impl ModuleOperationIr {
             }
             ModuleOperationIr::MaxPool3dWithIndices(repr) => {
                 repr.x.mark_read_only(nodes, &mut output);
+            }
+            ModuleOperationIr::InstanceNormStatistics(repr) => {
+                repr.input.mark_read_only(nodes, &mut output);
             }
             ModuleOperationIr::MaxPool3dWithIndicesBackward(repr) => {
                 repr.x.mark_read_only(nodes, &mut output);
@@ -4807,6 +4826,11 @@ impl ModuleOperationIr {
                 v.visit_tensor_mut(&mut repr.x);
                 v.visit_tensor_mut(&mut repr.out);
                 v.visit_tensor_mut(&mut repr.out_indices);
+            }
+            ModuleOperationIr::InstanceNormStatistics(repr) => {
+                v.visit_tensor_mut(&mut repr.input);
+                v.visit_tensor_mut(&mut repr.out_mean);
+                v.visit_tensor_mut(&mut repr.out_denominator);
             }
             ModuleOperationIr::MaxPool3dWithIndicesBackward(repr) => {
                 v.visit_tensor_mut(&mut repr.x);

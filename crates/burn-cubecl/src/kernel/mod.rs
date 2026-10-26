@@ -37,6 +37,8 @@ pub mod ctc;
 pub mod fft;
 /// Grid sampling kernels
 pub mod grid_sample;
+/// Normalization kernels
+pub mod norm;
 /// Interpolation kernels
 pub mod interpolate;
 /// Matmul kernels

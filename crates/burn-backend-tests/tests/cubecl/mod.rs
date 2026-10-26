@@ -16,6 +16,7 @@ mod conv_transpose3d;
 mod cross;
 mod gather;
 mod grid_sample_3d;
+mod instance_norm;
 mod interpolate_nearest;
 mod mask_fill;
 mod mask_where;

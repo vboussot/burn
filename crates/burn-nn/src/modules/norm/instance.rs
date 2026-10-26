@@ -1,7 +1,6 @@
 use crate::Initializer;
 use burn_core as burn;
 
-use crate::norm::group_norm;
 use burn::config::Config;
 use burn::module::{Content, DisplaySettings, ModuleDisplay};
 use burn::module::{Module, Param};
@@ -94,13 +93,10 @@ impl InstanceNorm {
     pub fn forward<const D: usize>(&self, input: Tensor<D>) -> Tensor<D> {
         assert_shape!(input, [_, self.num_channels, ..]);
 
-        // Instance norm is equivalent to group norm when the number of groups is equal to the number of channels.
-        let num_groups = self.num_channels;
-
         let gamma = self.gamma.as_ref().map(|x| x.val());
         let beta = self.beta.as_ref().map(|x| x.val());
 
-        group_norm(input, gamma, beta, num_groups, self.epsilon, self.affine)
+        burn::tensor::module::instance_norm(input, gamma, beta, self.epsilon)
     }
 }
 

@@ -12,6 +12,40 @@ use crate::{
     },
 };
 
+/// Applies Instance Normalization over every axis after the first two of `input`,
+/// `(x - mean) / sqrt(var + epsilon) * gamma + beta`: the statistics of each batch entry and
+/// channel are one operation ([`instance_norm_statistics`](ModuleOps::instance_norm_statistics)), the
+/// normalization broadcast elementwise operations, which a fusing backend runs with what follows.
+/// `gamma` and `beta` are `[channels]`, cast to the input's dtype.
+pub fn instance_norm<const D: usize>(
+    input: Tensor<D>,
+    gamma: Option<Tensor<1>>,
+    beta: Option<Tensor<1>>,
+    epsilon: f64,
+) -> Tensor<D> {
+    assert!(D >= 3, "instance_norm takes a tensor of rank 3 or more, got {D}");
+    let dims = input.dims();
+    let dtype = input.dtype();
+    let (mean, denominator) =
+        Dispatch::instance_norm_statistics(input.primitive.clone().into_float(), epsilon);
+    let per_entry: [usize; D] = core::array::from_fn(|i| if i < 2 { dims[i] } else { 1 });
+    let statistic = |tensor| Tensor::<2>::new(BridgeTensor::float(tensor)).reshape(per_entry);
+    let normalized = (input - statistic(mean)) / statistic(denominator);
+
+    let affine = |parameter: Tensor<1>| {
+        let per_channel: [usize; D] = core::array::from_fn(|i| if i == 1 { dims[1] } else { 1 });
+        parameter.cast(dtype).reshape(per_channel)
+    };
+    let scaled = match gamma {
+        Some(gamma) => normalized * affine(gamma),
+        None => normalized,
+    };
+    match beta {
+        Some(beta) => scaled + affine(beta),
+        None => scaled,
+    }
+}
+
 /// Applies batch normalization using explicitly supplied channel statistics.
 ///
 /// `input` has shape `[batch, channels, ...]`; `gamma`, `beta`, `mean`, and

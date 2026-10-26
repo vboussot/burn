@@ -600,6 +600,14 @@ impl RelativeOps for ModuleOperationIr {
                 ceil_mode: desc.ceil_mode,
                 out: desc.out.to_relative(converter),
             }),
+            ModuleOperationIr::InstanceNormStatistics(desc) => {
+                ModuleOperationIr::InstanceNormStatistics(InstanceNormStatisticsOpIr {
+                    input: desc.input.to_relative(converter),
+                    epsilon: desc.epsilon,
+                    out_mean: desc.out_mean.to_relative(converter),
+                    out_denominator: desc.out_denominator.to_relative(converter),
+                })
+            }
             ModuleOperationIr::MaxPool3dWithIndices(desc) => {
                 ModuleOperationIr::MaxPool3dWithIndices(MaxPool3dWithIndicesOpIr {
                     x: desc.x.to_relative(converter),
