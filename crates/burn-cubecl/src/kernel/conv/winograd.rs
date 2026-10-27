@@ -259,14 +259,14 @@ fn input_line<E: Float>(
         let x3 = x[comptime![at + 3 * step]];
         let x4 = x[comptime![at + 4 * step]];
         let x5 = x[comptime![at + 5 * step]];
-        let quarter = E::new(0.25);
-        let half = E::new(0.5);
-        x[at] = (x0 - x2 * E::new(5.0)) * quarter + x4;
+        let quarter = E::new(0.25_f32);
+        let half = E::new(0.5_f32);
+        x[at] = (x0 - x2 * E::new(5.0_f32)) * quarter + x4;
         x[comptime![at + step]] = (x3 + x4) - (x1 + x2) * quarter;
         x[comptime![at + 2 * step]] = (x4 - x3) + (x1 - x2) * quarter;
         x[comptime![at + 3 * step]] = (x4 - x2) + (x3 - x1) * half;
         x[comptime![at + 4 * step]] = (x4 - x2) + (x1 - x3) * half;
-        x[comptime![at + 5 * step]] = (x1 - x3 * E::new(5.0)) * quarter + x5;
+        x[comptime![at + 5 * step]] = (x1 - x3 * E::new(5.0_f32)) * quarter + x5;
     }
 }
 
@@ -289,16 +289,16 @@ fn kernel_line<E: Float>(
     let g1 = from[comptime![at + step]];
     let g2 = from[comptime![at + 2 * step]];
     if comptime![n == 4] {
-        let half = E::new(0.5);
+        let half = E::new(0.5_f32);
         to[to_at] = g0;
         to[comptime![to_at + to_step]] = (g0 + g1 + g2) * half;
         to[comptime![to_at + 2 * to_step]] = (g0 - g1 + g2) * half;
         to[comptime![to_at + 3 * to_step]] = g2;
     } else if comptime![taps == 3] {
-        let two_thirds = E::new(0.6666667);
-        let minus_two_thirds = E::new(-0.6666667);
-        let four_g0 = g0 * E::new(4.0);
-        let two_g1 = g1 * E::new(2.0);
+        let two_thirds = E::new(0.6666667_f32);
+        let minus_two_thirds = E::new(-0.6666667_f32);
+        let four_g0 = g0 * E::new(4.0_f32);
+        let two_g1 = g1 * E::new(2.0_f32);
         to[to_at] = four_g0;
         to[comptime![to_at + to_step]] = (g0 + g1 + g2) * two_thirds;
         to[comptime![to_at + 2 * to_step]] = (g0 - g1 + g2) * two_thirds;
@@ -308,14 +308,14 @@ fn kernel_line<E: Float>(
     } else {
         let g3 = from[comptime![at + 3 * step]];
         let g4 = from[comptime![at + 4 * step]];
-        let two_thirds = E::new(0.6666667);
-        let minus_two_thirds = E::new(-0.6666667);
+        let two_thirds = E::new(0.6666667_f32);
+        let minus_two_thirds = E::new(-0.6666667_f32);
         let even = g0 + g2 + g4;
         let odd = g1 + g3;
         // At the half points the taps weigh 1, 1/2, 1/4, 1/8, 1/16, scaled by four.
-        let half_even = g0 * E::new(4.0) + g2 + g4 * E::new(0.25);
-        let half_odd = g1 * E::new(2.0) + g3 * E::new(0.5);
-        to[to_at] = g0 * E::new(4.0);
+        let half_even = g0 * E::new(4.0_f32) + g2 + g4 * E::new(0.25_f32);
+        let half_odd = g1 * E::new(2.0_f32) + g3 * E::new(0.5_f32);
+        to[to_at] = g0 * E::new(4.0_f32);
         to[comptime![to_at + to_step]] = (even + odd) * two_thirds;
         to[comptime![to_at + 2 * to_step]] = (even - odd) * two_thirds;
         to[comptime![to_at + 3 * to_step]] = (half_even + half_odd) * minus_two_thirds;
@@ -349,7 +349,7 @@ fn output_line<E: Float>(
         let m4 = from[comptime![at + 4 * step]];
         let m5 = from[comptime![at + 5 * step]];
         to[to_at] = m0 + m1 + m2 + m3 + m4;
-        to[comptime![to_at + to_step]] = (m1 - m2) + (m3 - m4) * E::new(0.5) + m5;
+        to[comptime![to_at + to_step]] = (m1 - m2) + (m3 - m4) * E::new(0.5_f32) + m5;
     } else {
         let m4 = from[comptime![at + 4 * step]];
         let m5 = from[comptime![at + 5 * step]];
@@ -358,9 +358,9 @@ fn output_line<E: Float>(
         let half_even = m3 + m4;
         let half_odd = m3 - m4;
         to[to_at] = m0 + even + half_even;
-        to[comptime![to_at + to_step]] = odd + half_odd * E::new(0.5);
-        to[comptime![to_at + 2 * to_step]] = even + half_even * E::new(0.25);
-        to[comptime![to_at + 3 * to_step]] = odd + half_odd * E::new(0.125) + m5;
+        to[comptime![to_at + to_step]] = odd + half_odd * E::new(0.5_f32);
+        to[comptime![to_at + 2 * to_step]] = even + half_even * E::new(0.25_f32);
+        to[comptime![to_at + 3 * to_step]] = odd + half_odd * E::new(0.125_f32) + m5;
     }
 }
 
@@ -492,7 +492,7 @@ fn winograd_input_kernel<E: Float, T: Float>(
             if inside && coordinate >= pad && coordinate < extent + pad {
                 d[comptime![line * n + c]] = T::cast_from(input[at + (coordinate - pad) * stride]);
             } else {
-                d[comptime![line * n + c]] = T::new(0.0);
+                d[comptime![line * n + c]] = T::new(0.0_f32);
             }
         }
     }
@@ -574,7 +574,7 @@ fn winograd_output_kernel<E: Float, T: Float>(
     }
 
     let bias: ComptimeOption<T> = bias.as_ref().map(|bias| T::cast_from(bias[channel]));
-    let bias = bias.unwrap_or_else(|| T::new(0.0));
+    let bias = bias.unwrap_or_else(|| T::new(0.0_f32));
     #[unroll]
     for v in 0..voxels {
         let mut inside = true;

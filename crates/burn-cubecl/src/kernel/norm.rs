@@ -218,8 +218,8 @@ fn instance_norm_statistics_kernel<E: Float>(
     let base = batch * input.stride(0) + channel * input.stride(1);
 
     let mut n = 0usize;
-    let mut mean = E::new(0.0);
-    let mut deviation = E::new(0.0);
+    let mut mean = E::new(0.0_f32);
+    let mut deviation = E::new(0.0_f32);
     // The lane's positions: `lane`, `lane + lanes`, and so on.
     for i in 0..(count - lane + lanes - 1) / lanes {
         let x = input[spatial_at(base, lane + i * lanes, &spatial)];
@@ -258,9 +258,9 @@ fn instance_norm_merge_kernel<E: Float>(
     let (entry, group) = groups.div_mod(ABSOLUTE_POS);
     let first = group * span;
     let last = if first + span < per { first + span } else { per };
-    let mut count = E::new(0.0);
-    let mut mean = E::new(0.0);
-    let mut deviation = E::new(0.0);
+    let mut count = E::new(0.0_f32);
+    let mut mean = E::new(0.0_f32);
+    let mut deviation = E::new(0.0_f32);
     for i in first..last {
         let at = entry * per + i;
         let n = counts.read(at);
