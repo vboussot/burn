@@ -45,7 +45,10 @@ pub fn conv_winograd<const N: usize>(
     options: ConvOptions<N>,
     tile: usize,
 ) -> Result<CubeTensor, ConvSetupError> {
-    assert!(tile == 2 || tile == 4, "a Winograd tile covers 2 or 4 output voxels per axis, not {tile}");
+    assert!(
+        tile == 2 || tile == 4,
+        "a Winograd tile covers 2 or 4 output voxels per axis, not {tile}"
+    );
     let rank = input.meta.num_dims();
     let kernel = &weight.meta.shape()[1..rank - 1];
     let taps = kernel[0];
@@ -112,14 +115,22 @@ pub fn conv_winograd<const N: usize>(
             N,
             taps,
             tile,
-            [dtype_to_storage_type(dtype), dtype_to_storage_type(transform)],
+            [
+                dtype_to_storage_type(dtype),
+                dtype_to_storage_type(transform),
+            ],
         )
     };
     let kernels = swap_dims(kernels, 1, 2);
 
     let mut out_shape = shape.to_vec();
     out_shape[N + 1] = out_channels;
-    let output = empty_device_dtype(client.clone(), device.clone(), Shape::from(out_shape), dtype);
+    let output = empty_device_dtype(
+        client.clone(),
+        device.clone(),
+        Shape::from(out_shape),
+        dtype,
+    );
 
     // One block for the whole batch when it fits, else blocks of tile rows within each batch entry.
     let blocks: Vec<[usize; 4]> = if points * batch_size * tiles[0] * plane * widest <= budget {
@@ -169,7 +180,10 @@ pub fn conv_winograd<const N: usize>(
                 N,
                 taps,
                 tile,
-                [dtype_to_storage_type(dtype), dtype_to_storage_type(transform)],
+                [
+                    dtype_to_storage_type(dtype),
+                    dtype_to_storage_type(transform),
+                ],
             )
         };
 
@@ -201,7 +215,10 @@ pub fn conv_winograd<const N: usize>(
                 N,
                 taps,
                 tile,
-                [dtype_to_storage_type(dtype), dtype_to_storage_type(transform)],
+                [
+                    dtype_to_storage_type(dtype),
+                    dtype_to_storage_type(transform),
+                ],
             )
         };
     }
@@ -477,7 +494,8 @@ fn winograd_input_kernel<E: Float, T: Float>(
                 tile_index += offsets[1];
             }
             let coordinate = tile_index * tile + comptime![(line / pow(n, dims - 2 - axis)) % n];
-            inside = inside && coordinate >= pad && coordinate < input.shape(comptime![1 + axis]) + pad;
+            inside =
+                inside && coordinate >= pad && coordinate < input.shape(comptime![1 + axis]) + pad;
             at += (coordinate - pad) * input.stride(comptime![1 + axis]);
         }
         let mut tile_index = pos[dims];

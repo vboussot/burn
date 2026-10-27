@@ -19,6 +19,16 @@ pub fn conv_direct<const N: usize>(
     bias: Option<CubeTensor>,
     options: ConvOptions<N>,
 ) -> Result<CubeTensor, ConvSetupError> {
+    // A half-precision sum over many taps drifts by a rounding per term: the direct kernel runs in float32.
+    if matches!(
+        input.dtype,
+        burn_backend::DType::F16 | burn_backend::DType::BF16
+    ) {
+        let dtype = input.dtype;
+        let full = |tensor: CubeTensor| crate::kernel::cast(tensor, burn_backend::DType::F32);
+        let output = conv_direct::<N>(full(input), full(weight), bias.map(full), options)?;
+        return Ok(crate::kernel::cast(output, dtype));
+    }
     let out_dtype = input.dtype;
     let rank = input.meta.shape().num_dims();
     let dim_c = rank - 1;

@@ -916,6 +916,13 @@ pub fn conv_im2col<const N: usize>(
     if options.groups != 1 {
         return Err(ConvSetupError::Groups(options.groups));
     }
+    // A half-precision product sums thousands of taps: the columns and their matmul run in float32.
+    if matches!(input.dtype, DType::F16 | DType::BF16) {
+        let dtype = input.dtype;
+        let full = |tensor: CubeTensor| crate::kernel::cast(tensor, DType::F32);
+        let output = conv_im2col::<N>(full(input), full(weight), bias.map(full), options)?;
+        return Ok(crate::kernel::cast(output, dtype));
+    }
 
     let rank = input.meta.num_dims();
     let dim_c = rank - 1;

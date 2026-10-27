@@ -27,10 +27,7 @@ const MERGE_SPAN: usize = 64;
 /// The mean of each channel of each batch entry of `input` over every axis after the first two, and
 /// `sqrt(var + epsilon)` with `var` the biased variance, as two `[batch_size, channels]` tensors of the
 /// input's type; a float16 tensor is measured in float32.
-pub fn instance_norm_statistics(
-    input: CubeTensor,
-    epsilon: f64,
-) -> (CubeTensor, CubeTensor) {
+pub fn instance_norm_statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
     let dtype = input.dtype;
     if matches!(dtype, DType::F16 | DType::BF16) {
         let (mean, denominators) = instance_norm_statistics(cast(input, DType::F32), epsilon);
@@ -90,7 +87,12 @@ fn statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
         spatial_strides.push(strides[*axis]);
     }
     let partial = |per: usize| {
-        empty_device_dtype(client.clone(), device.clone(), Shape::new([entries * per]), dtype)
+        empty_device_dtype(
+            client.clone(),
+            device.clone(),
+            Shape::new([entries * per]),
+            dtype,
+        )
     };
     let (mut means, mut deviations, mut counts) = (partial(lanes), partial(lanes), partial(lanes));
     let threads = entries * lanes;
@@ -130,7 +132,14 @@ fn statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
                 &client,
                 calculate_cube_count_elemwise(&client, threads, cube_dim),
                 cube_dim,
-                address_type!(means, deviations, counts, merged_means, merged_deviations, merged_counts),
+                address_type!(
+                    means,
+                    deviations,
+                    counts,
+                    merged_means,
+                    merged_deviations,
+                    merged_counts
+                ),
                 means.into_linear_view(),
                 deviations.into_linear_view(),
                 counts.into_linear_view(),
@@ -257,7 +266,11 @@ fn instance_norm_merge_kernel<E: Float>(
     }
     let (entry, group) = groups.div_mod(ABSOLUTE_POS);
     let first = group * span;
-    let last = if first + span < per { first + span } else { per };
+    let last = if first + span < per {
+        first + span
+    } else {
+        per
+    };
     let mut count = E::new(0.0_f32);
     let mut mean = E::new(0.0_f32);
     let mut deviation = E::new(0.0_f32);
@@ -274,7 +287,10 @@ fn instance_norm_merge_kernel<E: Float>(
     merged_means.write(ABSOLUTE_POS, mean);
     merged_counts.write(ABSOLUTE_POS, count);
     if finish {
-        merged_deviations.write(ABSOLUTE_POS, (deviation / count + epsilon.get::<E>()).sqrt());
+        merged_deviations.write(
+            ABSOLUTE_POS,
+            (deviation / count + epsilon.get::<E>()).sqrt(),
+        );
     } else {
         merged_deviations.write(ABSOLUTE_POS, deviation);
     }
