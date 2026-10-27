@@ -70,7 +70,7 @@ quantization = []
 distributed = ["cuda"]
 
 [dependencies]
-burn-tensor = { workspace = true, features = ["autodiff"] }
+burn-tensor = { workspace = true, features = ["autodiff", "extension"] }
 burn-backend = { workspace = true }
 # Lets tests reach reference implementations (`burn_backend::ops::*_ref`) through the dispatch backend.
 burn-dispatch = { workspace = true }
