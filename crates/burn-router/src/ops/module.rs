@@ -1154,6 +1154,25 @@ impl<R: RouterChannel> ModuleOps<Self> for BackendRouter<R> {
             .output()
     }
 
+    fn instance_norm_statistics(
+        tensor: FloatTensor<Self>,
+        epsilon: f64,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+        let client = tensor.client.clone();
+        let input = tensor.into_ir();
+        let epsilon = ScalarIr::new(epsilon, &input.dtype);
+        let desc =
+            InstanceNormStatisticsOpIr::create(input, epsilon, || client.create_empty_handle());
+
+        let [mean, denominator] = client
+            .register(OperationIr::Module(
+                ModuleOperationIr::InstanceNormStatistics(desc),
+            ))
+            .outputs();
+
+        (mean, denominator)
+    }
+
     fn adaptive_avg_pool3d(x: FloatTensor<Self>, output_size: [usize; 3]) -> FloatTensor<Self> {
         let client = x.client.clone();
 

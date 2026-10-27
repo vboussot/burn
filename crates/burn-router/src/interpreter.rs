@@ -2017,6 +2017,14 @@ impl<B: BackendIr> TensorInterpreter<B> {
                     );
                     handles.register_float_tensor::<B>(&desc.out.id, output);
                 }
+                ModuleOperationIr::InstanceNormStatistics(desc) => {
+                    let input = handles.get_float_tensor::<B>(&desc.input);
+                    let (mean, denominator) =
+                        B::instance_norm_statistics(input, desc.epsilon.elem());
+
+                    handles.register_float_tensor::<B>(&desc.out_mean.id, mean);
+                    handles.register_float_tensor::<B>(&desc.out_denominator.id, denominator);
+                }
                 ModuleOperationIr::MaxPool3dWithIndices(desc) => {
                     let x = handles.get_float_tensor::<B>(&desc.x);
 

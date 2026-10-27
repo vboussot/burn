@@ -70,6 +70,9 @@ positions when sequence lengths differ.
 
 #### Kernels
 
+- Measure `InstanceNorm` statistics in one CubeCL pass, without copying a channels-last input to
+  channels-first. The new `ModuleOps::instance_norm_statistics` returns the per-channel mean and
+  standard deviation, and `module::instance_norm` applies them.
 - Avoid a full-sized gradient copy in CubeCL FP32 `conv2d` bias backward, while retaining
   single-pass accumulation for FP16/BF16 to avoid intermediate overflow.
   ([#6173](https://github.com/tracel-ai/burn/pull/6173))

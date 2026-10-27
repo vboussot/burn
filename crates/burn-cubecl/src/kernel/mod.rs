@@ -41,6 +41,8 @@ pub mod grid_sample;
 pub mod interpolate;
 /// Matmul kernels
 pub mod matmul;
+/// Normalization kernels
+pub mod norm;
 /// Pooling kernels
 pub mod pool;
 /// Pseudo-random number generator kernels

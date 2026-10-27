@@ -20,6 +20,7 @@ mod ctc;
 mod deform_conv2d;
 mod fold4d;
 mod forward;
+mod instance_norm;
 mod lanczos3_interpolate;
 mod linear;
 mod maxpool1d;

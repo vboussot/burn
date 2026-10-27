@@ -849,6 +849,35 @@ pub trait ModuleOps<B: Backend> {
     ///
     /// x: [batch_size, channels, depth, height, width],
     fn adaptive_avg_pool3d(x: FloatTensor<B>, output_size: [usize; 3]) -> FloatTensor<B>;
+    /// The statistics of Instance Normalization: for each batch entry and channel of `tensor`, of
+    /// shape `[batch_size, channels, *]` and rank 3 or more, the mean over every axis after the
+    /// first two and `sqrt(var + epsilon)` with `var` the biased variance, as two tensors of shape
+    /// `[batch_size, channels]`.
+    fn instance_norm_statistics(
+        tensor: FloatTensor<B>,
+        epsilon: f64,
+    ) -> (FloatTensor<B>, FloatTensor<B>) {
+        let shape = tensor.shape();
+        let rank = shape.num_dims();
+        assert!(
+            rank >= 3,
+            "instance_norm takes a tensor of rank 3 or more, got {rank}"
+        );
+        let (batch_size, channels) = (shape[0], shape[1]);
+        let hidden = shape.num_elements() / (batch_size * channels);
+
+        let grouped = B::float_reshape(tensor, Shape::new([batch_size, channels, hidden]));
+        // Means rather than sums over the pixels: a float16 sum passes 65504.
+        let mean = B::float_mean_dim(grouped.clone(), 2);
+        let centered = B::float_sub(grouped, mean.clone());
+        let var = B::float_mean_dim(B::float_powi_scalar(centered, 2.into()), 2);
+        let denominator = B::float_sqrt(B::float_add_scalar(var, epsilon.into()));
+        let flat = Shape::new([batch_size, channels]);
+        (
+            B::float_reshape(mean, flat.clone()),
+            B::float_reshape(denominator, flat),
+        )
+    }
     /// Backward pass for the [adaptive avg pooling 3d](ModuleOps::adaptive_avg_pool3d) operation.
     fn adaptive_avg_pool3d_backward(x: FloatTensor<B>, grad: FloatTensor<B>) -> FloatTensor<B>;
     /// One dimensional adaptive avg pooling.

@@ -1678,6 +1678,26 @@ impl MaxPool2dWithIndicesOpIr {
     }
 }
 
+impl InstanceNormStatisticsOpIr {
+    /// Create a new operation IR from the given inputs: the mean and the denominator of each
+    /// batch entry and channel, `[batch_size, channels]`, of the input's type.
+    pub fn create(
+        input: TensorIr,
+        epsilon: ScalarIr,
+        mut new_id: impl FnMut() -> TensorId,
+    ) -> Self {
+        let shape = Shape::new([input.shape[0], input.shape[1]]);
+        let out_mean = TensorIr::uninit(new_id(), shape.clone(), input.dtype);
+        let out_denominator = TensorIr::uninit(new_id(), shape, input.dtype);
+        InstanceNormStatisticsOpIr {
+            input,
+            epsilon,
+            out_mean,
+            out_denominator,
+        }
+    }
+}
+
 impl MaxPool3dWithIndicesOpIr {
     #[allow(clippy::too_many_arguments)]
     pub fn create(

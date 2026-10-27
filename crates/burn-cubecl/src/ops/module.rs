@@ -330,6 +330,13 @@ impl ModuleOps<Self> for CubeBackend {
         kernel::pool::adaptive_avg_pool3d(x, output_size)
     }
 
+    fn instance_norm_statistics(
+        tensor: FloatTensor<Self>,
+        epsilon: f64,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+        kernel::norm::instance_norm_statistics(tensor, epsilon)
+    }
+
     fn adaptive_avg_pool3d_backward(
         x: FloatTensor<Self>,
         grad: FloatTensor<Self>,

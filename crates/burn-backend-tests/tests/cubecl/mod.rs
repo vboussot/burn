@@ -15,6 +15,7 @@ mod conv_transpose2d;
 mod conv_transpose3d;
 mod cross;
 mod gather;
+mod instance_norm;
 mod interpolate_nearest;
 mod mask_fill;
 mod mask_where;

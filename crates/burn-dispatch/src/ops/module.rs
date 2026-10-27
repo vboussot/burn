@@ -220,6 +220,13 @@ impl ModuleOps<Self> for Dispatch {
         B::adaptive_avg_pool2d_backward(x, grad)
     }
 
+    fn instance_norm_statistics(
+        tensor: FloatTensor<Self>,
+        epsilon: f64,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+        B::instance_norm_statistics(tensor, epsilon)
+    }
+
     fn adaptive_avg_pool3d(x: FloatTensor<Self>, output_size: [usize; 3]) -> FloatTensor<Self> {
         B::adaptive_avg_pool3d(x, output_size)
     }
