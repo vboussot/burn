@@ -6,7 +6,7 @@
 //! the order of `k`, one `acc += lhs * rhs` at a time, the order of the unit routines' register
 //! tiles, so the two give the same bits.
 
-use burn_backend::cubecl::dtype_to_storage_type;
+use burn_backend::{DType, cubecl::dtype_to_storage_type};
 use cubecl::{calculate_cube_count_elemwise, prelude::*};
 
 use crate::{kernel::utils::address_type, tensor::CubeTensor};
@@ -74,8 +74,8 @@ fn matmul_long_k_kernel<F: Float>(
     out[out_at] = acc;
 }
 
-/// Whether `out = lhs @ rhs` takes the long-`k` route: a float matmul without broadcast batch
-/// dimensions, an output within [`MAX_OUTPUT`] elements and a `k` of at least [`MIN_K`].
+/// Whether `out = lhs @ rhs` takes the long-`k` route: an `f32` or `f64` matmul without broadcast
+/// batch dimensions, an output within [`MAX_OUTPUT`] elements and a `k` of at least [`MIN_K`].
 pub(crate) fn applies(lhs: &CubeTensor, rhs: &CubeTensor, out: &CubeTensor) -> bool {
     let [lhs_shape, rhs_shape, out_shape] = [lhs, rhs, out].map(|t| t.meta.shape());
     let rank = out_shape.len();
@@ -88,7 +88,8 @@ pub(crate) fn applies(lhs: &CubeTensor, rhs: &CubeTensor, out: &CubeTensor) -> b
         && rhs.qparams.is_none()
         && lhs.dtype == out.dtype
         && rhs.dtype == out.dtype
-        && out.dtype.is_float()
+        // One accumulator per thread over a long k: a half-precision one would overflow.
+        && matches!(out.dtype, DType::F32 | DType::F64)
         && out_shape[rank - 2] * out_shape[rank - 1] <= MAX_OUTPUT
         && lhs_shape[rank - 1] >= MIN_K
 }
