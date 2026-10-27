@@ -855,13 +855,10 @@ pub trait ModuleOps<B: Backend> {
         let hidden = shape.num_elements() / (batch_size * channels);
 
         let grouped = B::float_reshape(tensor, Shape::new([batch_size, channels, hidden]));
-        let mean =
-            B::float_div_scalar(B::float_sum_dim(grouped.clone(), 2), (hidden as f64).into());
+        // Means rather than sums over the pixels: a float16 sum passes 65504.
+        let mean = B::float_mean_dim(grouped.clone(), 2);
         let centered = B::float_sub(grouped, mean.clone());
-        let var = B::float_div_scalar(
-            B::float_sum_dim(B::float_powi_scalar(centered, 2.into()), 2),
-            (hidden as f64).into(),
-        );
+        let var = B::float_mean_dim(B::float_powi_scalar(centered, 2.into()), 2);
         let denominator = B::float_sqrt(B::float_add_scalar(var, epsilon.into()));
         let flat = Shape::new([batch_size, channels]);
         (

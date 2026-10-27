@@ -89,7 +89,7 @@ impl InstanceNorm {
     ///
     /// # Panics
     ///
-    /// Panics if the input has rank < 2 or its second axis is not `num_channels`.
+    /// Panics if the input has rank < 3 or its second axis is not `num_channels`.
     pub fn forward<const D: usize>(&self, input: Tensor<D>) -> Tensor<D> {
         assert_shape!(input, [_, self.num_channels, ..]);
 
