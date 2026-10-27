@@ -28,6 +28,10 @@ unsupported combinations panic. Flex uses `f64` coordinate arithmetic and preser
 ties when resizing by output size.
 ([#6154](https://github.com/tracel-ai/burn/pull/6154), [@Sadik00789](https://github.com/Sadik00789))
 
+`module::interpolate3d` and the `Interpolate3d` module resize `[batch, channels, depth, height,
+width]` volumes with the same modes and options, as two 2D interpolations, so backend support is that
+of `interpolate`. `TfCropAndResize` is not supported in 3D. [@vboussot](https://github.com/vboussot)
+
 ### Device-time instrumentation
 
 `burn-instrument` and `#[compute]` annotations measure device time by model component. Measurement
