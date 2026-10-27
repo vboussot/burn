@@ -30,6 +30,10 @@ to retain size-derived mapping. See the [interpolation guide](building-blocks/mo
 for configuration and backend limitations.
 ([#6154](https://github.com/tracel-ai/burn/pull/6154), [@Sadik00789](https://github.com/Sadik00789))
 
+`module::interpolate3d` and the `Interpolate3d` module resize `[batch, channels, depth, height,
+width]` volumes with the same modes, as two 2D interpolations, so backend support is that of
+`interpolate`. [@vboussot](https://github.com/vboussot)
+
 ### Device-time instrumentation
 
 `burn-instrument` and `#[compute]` annotations measure device time by model component. Measurement

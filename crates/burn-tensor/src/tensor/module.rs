@@ -1128,6 +1128,93 @@ pub fn interpolate_output_size(input_size: [usize; 2], options: &InterpolateOpti
     }
 }
 
+/// Applies a 3D interpolation to `x`, `[batch, channels, depth, height, width]`, with the mode of
+/// `options`.
+///
+/// The output spatial size is `output_size`, or `floor(input_size * scale_factor)` from
+/// `scale_factor`, both `[depth, height, width]`; explicit scales drive scale-dependent
+/// coordinate transforms, as in [`interpolate`]. The resize runs as two [`interpolate`] calls,
+/// height and width first, then depth, so every mode [`interpolate`] supports on a backend is
+/// supported here.
+///
+/// # Panics
+///
+/// Panics unless exactly one of `output_size` or `scale_factor` is set, if `options` sets an
+/// output size or scale factor of its own, or under the conditions of [`interpolate`].
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // Upsample a volume by 2x along every axis.
+/// interpolate3d(x, None, Some([2.0, 2.0, 2.0]), InterpolateOptions::new(mode));
+/// ```
+pub fn interpolate3d(
+    x: Tensor<5>,
+    output_size: Option<[usize; 3]>,
+    scale_factor: Option<[f32; 3]>,
+    options: InterpolateOptions,
+) -> Tensor<5> {
+    let [batch, channels, depth, height, width] = x.dims();
+    let (planes, depths) = interpolate3d_passes(output_size, scale_factor, options);
+    let x = interpolate(x.reshape([batch, channels * depth, height, width]), planes);
+    let [_, _, out_height, out_width] = x.dims();
+    // Depth as the height of a `[.., planes, depth, 1]` view, which is the memory the plane
+    // pass wrote, so neither side of the depth pass copies on a channels-last backend.
+    let x = x
+        .reshape([batch * channels, depth, out_height * out_width])
+        .swap_dims(1, 2)
+        .unsqueeze_dim::<4>(3);
+    let x = interpolate(x, depths).squeeze_dim::<3>(3).swap_dims(1, 2);
+    let [_, out_depth, _] = x.dims();
+    x.reshape([batch, channels, out_depth, out_height, out_width])
+}
+
+/// The spatial size, `[depth, height, width]`, of the output [`interpolate3d`] returns for an
+/// input whose spatial size is `input_size`.
+///
+/// # Panics
+///
+/// Under the same conditions as [`interpolate3d`].
+pub fn interpolate3d_output_size(
+    input_size: [usize; 3],
+    output_size: Option<[usize; 3]>,
+    scale_factor: Option<[f32; 3]>,
+    options: InterpolateOptions,
+) -> [usize; 3] {
+    let [depth, height, width] = input_size;
+    let (planes, depths) = interpolate3d_passes(output_size, scale_factor, options);
+    let [out_height, out_width] = interpolate_output_size([height, width], &planes);
+    let [out_depth, _] = interpolate_output_size([depth, 1], &depths);
+    [out_depth, out_height, out_width]
+}
+
+/// The options of [`interpolate3d`]'s two passes: over height and width, then over depth and a
+/// unit width, which every mode maps onto itself.
+fn interpolate3d_passes(
+    output_size: Option<[usize; 3]>,
+    scale_factor: Option<[f32; 3]>,
+    options: InterpolateOptions,
+) -> (InterpolateOptions, InterpolateOptions) {
+    assert!(
+        options.output_size.is_none() && options.scale_factor.is_none(),
+        "interpolate3d takes its output size or scale factor as arguments, not in the options"
+    );
+    match (output_size, scale_factor) {
+        (Some([depth, height, width]), None) => (
+            options.clone().with_output_size([height, width]),
+            options.with_output_size([depth, 1]),
+        ),
+        (None, Some([depth, height, width])) => (
+            options.clone().with_scale_factor([height, width]),
+            options.with_scale_factor([depth, 1.0]),
+        ),
+        (Some(_), Some(_)) => {
+            panic!("interpolate3d must be given only one of output_size or scale_factor")
+        }
+        (None, None) => panic!("interpolate3d must be given output_size or scale_factor"),
+    }
+}
+
 /// Applies a linear transformation to the input tensor using the given weight and bias.
 ///
 /// ```math
