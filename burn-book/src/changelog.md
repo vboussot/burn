@@ -313,6 +313,7 @@ loading those checkpoints by filtering to `linear_inner` and `linear_outer`.
 
 #### Fusion and correctness fixes
 
+- Fix CubeCL `max_pool3d`, which did not compile on WebGPU or any other WGSL target.
 - Return NaN for variance reductions over empty axes instead of panicking or returning zero.
   ([issue #6236](https://github.com/tracel-ai/burn/issues/6236))
 - Preserve zero-length dimensions in `reshape(Shape)` and `unsqueeze`, and reject mismatched target
