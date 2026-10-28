@@ -388,3 +388,26 @@ fn reduction_extrema_with_indices_over_a_long_axis_should_match_reference_backen
     min.into_data().assert_eq(&min_ref.into_data(), false);
     min_at.into_data().assert_eq(&min_at_ref.into_data(), false);
 }
+
+#[test]
+fn reduction_extrema_over_a_long_axis_should_match_reference_backend() {
+    let device = Default::default();
+    let ref_device = ReferenceDevice::new();
+    let length = 70_000;
+    let values: Vec<f32> = (0..3 * length)
+        .map(|i| ((i * 7919) % 1000) as f32 - 500.0)
+        .collect();
+    let tensor =
+        TestTensor::<2>::from_data(burn_tensor::TensorData::new(values, [3, length]), &device);
+    let tensor_ref = TestTensor::<2>::from_data(tensor.to_data(), &ref_device);
+    tensor
+        .clone()
+        .max_dim(1)
+        .into_data()
+        .assert_eq(&tensor_ref.clone().max_dim(1).into_data(), false);
+    tensor
+        .min_dim(1)
+        .into_data()
+        .assert_eq(&tensor_ref.min_dim(1).into_data(), false);
+}
+

@@ -432,6 +432,19 @@ pub fn reduce_dim(
         return Ok(output);
     }
 
+    // An extremum does not depend on the order the axis is walked in, so a long axis feeding few
+    // outputs takes the cube routine, as for the extremum with its index.
+    let routine = if matches!(
+        config,
+        ReduceOperationConfig::Min | ReduceOperationConfig::Max
+    ) && few_outputs_over_a_long_axis(input.meta.shape(), dim)
+    {
+        RoutineStrategy::Cube(BlueprintStrategy::Inferred(CubeStrategy {
+            use_planes: false,
+        }))
+    } else {
+        RoutineStrategy::Unit(BlueprintStrategy::Inferred(UnitStrategy))
+    };
     let result = match strategy {
         KernelReduceStrategy::Unspecified => cubek::reduce::reduce(
             &client,
@@ -439,7 +452,7 @@ pub fn reduce_dim(
             output.clone().binding(),
             dim,
             ReduceStrategy {
-                routine: RoutineStrategy::Unit(BlueprintStrategy::Inferred(UnitStrategy)),
+                routine,
                 vectorization: VectorizationStrategy {
                     parallel_output_vectorization: false,
                 },
