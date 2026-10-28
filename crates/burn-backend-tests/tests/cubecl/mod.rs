@@ -19,6 +19,7 @@ mod gather;
 mod grid_sample_3d;
 mod instance_norm;
 mod interpolate_nearest;
+mod long_axis_numerics;
 mod mask_fill;
 mod mask_where;
 mod matmul;
