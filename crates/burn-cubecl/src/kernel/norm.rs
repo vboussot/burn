@@ -26,15 +26,20 @@ const MERGE_SPAN: usize = 64;
 
 /// The mean of each channel of each batch entry of `input` over every axis after the first two, and
 /// `sqrt(var + epsilon)` with `var` the biased variance, as two `[batch_size, channels]` tensors of the
-/// input's type; a float16 tensor is measured in float32.
+/// input's type; a float16 tensor is measured in float32, each element widened as it is read.
 pub fn instance_norm_statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
     let dtype = input.dtype;
-    if matches!(dtype, DType::F16 | DType::BF16) {
-        let (mean, denominators) = instance_norm_statistics(cast(input, DType::F32), epsilon);
-        return (cast(mean, dtype), cast(denominators, dtype));
-    }
+    let measured = match dtype {
+        DType::F16 | DType::BF16 => DType::F32,
+        other => other,
+    };
     let input = dense(input);
-    let (mean, denominators) = statistics(input.clone(), epsilon);
+    let (mean, denominators) = statistics(input.clone(), epsilon, measured);
+    let (mean, denominators) = if measured == dtype {
+        (mean, denominators)
+    } else {
+        (cast(mean, dtype), cast(denominators, dtype))
+    };
     let shape = input.shape();
     let flat = Shape::new([shape[0], shape[1]]);
     let as_flat = |tensor: CubeTensor| {
@@ -57,10 +62,10 @@ fn dense(tensor: CubeTensor) -> CubeTensor {
     }
 }
 
-/// The mean and `sqrt(var + epsilon)` of each entry of the dense `input`, `[entries]` each: Welford's
-/// statistics of each lane of every entry, merged by spans until one thread per entry finishes.
-fn statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
-    let dtype = input.dtype;
+/// The mean and `sqrt(var + epsilon)` of each entry of the dense `input`, `[entries]` each, in `dtype`:
+/// Welford's statistics of each lane of every entry, merged by spans until one thread per entry finishes.
+fn statistics(input: CubeTensor, epsilon: f64, dtype: DType) -> (CubeTensor, CubeTensor) {
+    let input_dtype = input.dtype;
     let shape = input.shape();
     let rank = shape.num_dims();
     assert!(
@@ -114,7 +119,10 @@ fn statistics(input: CubeTensor, epsilon: f64) -> (CubeTensor, CubeTensor) {
             lanes,
             threads,
             entry_fastest,
-            dtype_to_storage_type(dtype),
+            [
+                dtype_to_storage_type(input_dtype),
+                dtype_to_storage_type(dtype),
+            ],
         )
     };
 
@@ -203,8 +211,8 @@ fn spatial_at(base: usize, position: usize, spatial: &Spatial) -> usize {
 /// is `(lane, entry)` with the entry fastest, or `(entry, lane)` with the lane fastest, `inner` being
 /// the extent of the faster one. Written at `entry * lanes + lane`.
 #[cube(launch_unchecked, address_type = "dynamic")]
-fn instance_norm_statistics_kernel<E: Float>(
-    input: &Tensor<E>,
+fn instance_norm_statistics_kernel<I: Float, E: Float>(
+    input: &Tensor<I>,
     mut means: LinearViewMut<'_, E>,
     mut deviations: LinearViewMut<'_, E>,
     mut counts: LinearViewMut<'_, E>,
@@ -215,7 +223,7 @@ fn instance_norm_statistics_kernel<E: Float>(
     lanes: usize,
     threads: usize,
     #[comptime] entry_fastest: bool,
-    #[define(E)] _dtype: ElemType,
+    #[define(I, E)] _dtypes: [ElemType; 2],
 ) {
     if ABSOLUTE_POS >= threads {
         terminate!();
@@ -231,7 +239,7 @@ fn instance_norm_statistics_kernel<E: Float>(
     let mut deviation = E::new(0.0_f32);
     // The lane's positions: `lane`, `lane + lanes`, and so on.
     for i in 0..(count - lane + lanes - 1) / lanes {
-        let x = input[spatial_at(base, lane + i * lanes, &spatial)];
+        let x = E::cast_from(input[spatial_at(base, lane + i * lanes, &spatial)]);
         n += 1;
         let delta = x - mean;
         mean += delta / E::cast_from(n);
