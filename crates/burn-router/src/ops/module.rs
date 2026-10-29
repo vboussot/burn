@@ -1094,11 +1094,8 @@ impl<R: RouterChannel> ModuleOps<Self> for BackendRouter<R> {
         let client = tensor.client.clone();
         let input = tensor.into_ir();
         let epsilon = ScalarIr::new(epsilon, &input.dtype);
-        let desc = InstanceNormStatisticsOpIr::create(
-            input,
-            epsilon,
-            || client.create_empty_handle(),
-        );
+        let desc =
+            InstanceNormStatisticsOpIr::create(input, epsilon, || client.create_empty_handle());
 
         let [mean, denominator] = client
             .register(OperationIr::Module(

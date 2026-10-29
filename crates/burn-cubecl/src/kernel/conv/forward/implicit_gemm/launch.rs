@@ -40,6 +40,34 @@ pub fn conv_gemm_simple_sync<const N: usize>(
     )
 }
 
+/// [`conv_gemm_simple_sync`] with `row_count` rows of planes and `partition_k` tiles along k per
+/// partition, where the selector would pick its own: a larger tile, for autotune to weigh.
+pub fn conv_gemm_simple_sync_tiled<const N: usize>(
+    input: CubeTensor,
+    weight: CubeTensor,
+    bias: Option<CubeTensor>,
+    options: ConvOptions<N>,
+    tile_kind: AcceleratedTileKind,
+    (row_count, partition_k): (u32, u32),
+) -> Result<CubeTensor, ConvSetupError> {
+    let algorithm = match tile_kind {
+        AcceleratedTileKind::Cmma => ConvAlgorithm::SimpleSyncCyclic,
+        AcceleratedTileKind::Mma => ConvAlgorithm::SimpleSyncStrided,
+    };
+    launch_convolution_forward::<N>(
+        &Strategy::InferredTiled {
+            algorithm,
+            tile_kind,
+            row_count,
+            partition_k,
+        },
+        input,
+        weight,
+        bias,
+        options,
+    )
+}
+
 pub fn conv_gemm_simple_async<const N: usize>(
     input: CubeTensor,
     weight: CubeTensor,

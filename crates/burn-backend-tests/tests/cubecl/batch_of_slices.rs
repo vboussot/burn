@@ -6,7 +6,8 @@ use burn_tensor::ops::{ConvOptions, ConvTransposeOptions};
 use burn_tensor::{Distribution, Tolerance, module};
 
 fn pair<const D: usize>(shape: [usize; D]) -> (TestTensor<D>, TestTensor<D>) {
-    let tensor = TestTensor::<D>::random(shape, Distribution::Uniform(-1., 1.), &Default::default());
+    let tensor =
+        TestTensor::<D>::random(shape, Distribution::Uniform(-1., 1.), &Default::default());
     let reference = TestTensor::<D>::from_data(tensor.to_data(), &ReferenceDevice::new());
     (tensor, reference)
 }

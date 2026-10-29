@@ -21,7 +21,11 @@ use crate::{
 /// # Panics
 ///
 /// On any other mode.
-pub fn interpolate3d(x: Tensor<5>, output_size: [usize; 3], options: InterpolateOptions) -> Tensor<5> {
+pub fn interpolate3d(
+    x: Tensor<5>,
+    output_size: [usize; 3],
+    options: InterpolateOptions,
+) -> Tensor<5> {
     let device = x.device();
     let shape = x.dims();
     let index = |values: Vec<i64>| {
@@ -50,15 +54,19 @@ pub fn interpolate3d(x: Tensor<5>, output_size: [usize; 3], options: Interpolate
                 };
                 let coordinates: Vec<f64> = (0..output).map(coordinate).collect();
                 let low: Vec<i64> = coordinates.iter().map(|c| c.floor() as i64).collect();
-                let high: Vec<i64> = low.iter().map(|l| Ord::min(l + 1, input as i64 - 1)).collect();
+                let high: Vec<i64> = low
+                    .iter()
+                    .map(|l| Ord::min(l + 1, input as i64 - 1))
+                    .collect();
                 let weight: Vec<f32> = (coordinates.iter().zip(&low))
                     .map(|(c, l)| (c - *l as f64) as f32)
                     .collect();
                 // The weight of the high neighbour, broadcast along the axis.
                 let mut weight_shape = [1; 5];
                 weight_shape[2 + axis] = output;
-                let weight = Tensor::<5>::from_data(crate::TensorData::new(weight, weight_shape), &device)
-                    .cast(out.dtype());
+                let weight =
+                    Tensor::<5>::from_data(crate::TensorData::new(weight, weight_shape), &device)
+                        .cast(out.dtype());
                 let low = out.clone().select(2 + axis, index(low));
                 let high = out.select(2 + axis, index(high));
                 low * (weight.ones_like() - weight.clone()) + high * weight
@@ -80,7 +88,10 @@ pub fn instance_norm<const D: usize>(
     beta: Option<Tensor<1>>,
     epsilon: f64,
 ) -> Tensor<D> {
-    assert!(D >= 3, "instance_norm takes a tensor of rank 3 or more, got {D}");
+    assert!(
+        D >= 3,
+        "instance_norm takes a tensor of rank 3 or more, got {D}"
+    );
     let dims = input.dims();
     let dtype = input.dtype();
     let (mean, denominator) =

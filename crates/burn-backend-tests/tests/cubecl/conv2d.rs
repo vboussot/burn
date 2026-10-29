@@ -180,7 +180,11 @@ fn conv2d_same_in_half_precision_should_match_reference_backend() {
     let device = Default::default();
     let ref_device = ReferenceDevice::new();
     let half = |tensor: TestTensor<4>| tensor.cast(FloatDType::F16);
-    let input = half(TestTensor::random([2, 64, 96, 96], Distribution::Uniform(-1., 1.), &device));
+    let input = half(TestTensor::random(
+        [2, 64, 96, 96],
+        Distribution::Uniform(-1., 1.),
+        &device,
+    ));
     let weight = half(TestTensor::random(
         [64, 64, 3, 3],
         Distribution::Uniform(-0.05, 0.05),

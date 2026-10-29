@@ -94,14 +94,22 @@ fn instance_norm_should_leave_a_shared_input_untouched() {
 // 384 entries of 65536 samples, channels first and channels last.
 #[test]
 fn instance_norm_of_a_large_batch_of_slices_should_match_reference_backend() {
-    let input = TestTensor::<4>::random([16, 24, 256, 256], Distribution::Default, &Default::default());
+    let input = TestTensor::<4>::random(
+        [16, 24, 256, 256],
+        Distribution::Default,
+        &Default::default(),
+    );
     let reference = on_reference(&input);
     assert_matches_reference(input, reference, true);
 }
 
 #[test]
 fn instance_norm_of_a_large_batch_of_channels_last_slices_should_match_reference_backend() {
-    let input = TestTensor::<4>::random([16, 128, 96, 24], Distribution::Default, &Default::default());
+    let input = TestTensor::<4>::random(
+        [16, 128, 96, 24],
+        Distribution::Default,
+        &Default::default(),
+    );
     let reference = on_reference(&input).permute([0, 3, 1, 2]);
     assert_matches_reference(input.permute([0, 3, 1, 2]), reference, true);
 }
@@ -109,7 +117,8 @@ fn instance_norm_of_a_large_batch_of_channels_last_slices_should_match_reference
 // Deeper stages: many entries of few samples (a lane covers several entries' worth of threads).
 #[test]
 fn instance_norm_of_many_small_entries_should_match_reference_backend() {
-    let input = TestTensor::<4>::random([16, 256, 8, 8], Distribution::Default, &Default::default());
+    let input =
+        TestTensor::<4>::random([16, 256, 8, 8], Distribution::Default, &Default::default());
     let reference = on_reference(&input);
     assert_matches_reference(input, reference, true);
 }

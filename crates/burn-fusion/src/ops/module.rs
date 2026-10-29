@@ -1683,8 +1683,7 @@ impl<B: FusionBackend> ModuleOps<Fusion<B>> for Fusion<B> {
             InstanceNormStatisticsOpIr,
             |args: &InstanceNormStatisticsOpIr, handles: &mut HandleContainer<B::Handle>| {
                 let input = handles.get_float_tensor::<B>(&args.input);
-                let (mean, denominator) =
-                    B::instance_norm_statistics(input, args.epsilon.elem());
+                let (mean, denominator) = B::instance_norm_statistics(input, args.epsilon.elem());
 
                 handles.register_float_tensor::<B>(&args.out_mean.id, mean);
                 handles.register_float_tensor::<B>(&args.out_denominator.id, denominator);
@@ -1695,11 +1694,8 @@ impl<B: FusionBackend> ModuleOps<Fusion<B>> for Fusion<B> {
         let client = tensor.client.clone();
         let input = tensor.into_ir();
         let epsilon = ScalarIr::new(epsilon, &input.dtype);
-        let desc = InstanceNormStatisticsOpIr::create(
-            input,
-            epsilon,
-            || client.create_empty_handle(),
-        );
+        let desc =
+            InstanceNormStatisticsOpIr::create(input, epsilon, || client.create_empty_handle());
 
         let [mean, denominator] = client
             .register(

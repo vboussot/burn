@@ -131,6 +131,84 @@ pub fn conv_autotune<const N: usize>(
                 },
             ))
             .with(Tunable::new(
+                "simple_sync_cmma_rows16_k2",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (16, 2),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_cmma_rows8_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (8, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_cmma_rows16_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (16, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows16_k2",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (16, 2),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows8_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (8, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows16_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (16, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
                 "simple_async_cmma",
                 |(input, weight, bias, options)| {
                     conv_gemm_simple_async(input, weight, bias, options, AcceleratedTileKind::Cmma)

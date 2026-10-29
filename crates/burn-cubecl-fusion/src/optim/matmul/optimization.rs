@@ -495,6 +495,7 @@ impl FusedMatmulLaunch<'_> {
                 tile_matmul,
             } => {
                 let args = SimpleArgs {
+                    plane_tiling: None,
                     multi_rows,
                     tile_matmul: match tile_matmul {
                         AcceleratedTileKind::Cmma => TileMatmulKind::Cmma,

@@ -377,6 +377,7 @@ pub fn matmul_autotune(
         for (strategy, double_buf, group_extra, tile_group, tile_matmul) in [
             (
                 Strategy::SimpleCyclicCmma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: false,
                     tile_matmul: TileMatmulKind::Cmma,
                 })),
@@ -387,6 +388,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleCyclicMma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: false,
                     tile_matmul: TileMatmulKind::Mma,
                 })),
@@ -397,6 +399,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleCyclicCmma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: true,
                     tile_matmul: TileMatmulKind::Cmma,
                 })),
@@ -407,6 +410,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleCyclicMma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: true,
                     tile_matmul: TileMatmulKind::Mma,
                 })),
@@ -519,6 +523,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleTmaCmma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: false,
                     tile_matmul: TileMatmulKind::Cmma,
                 })),
@@ -529,6 +534,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleTmaMma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: false,
                     tile_matmul: TileMatmulKind::Mma,
                 })),
@@ -539,6 +545,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleTmaCmma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: true,
                     tile_matmul: TileMatmulKind::Cmma,
                 })),
@@ -549,6 +556,7 @@ pub fn matmul_autotune(
             ),
             (
                 Strategy::SimpleTmaMma(BlueprintStrategy::Inferred(SimpleArgs {
+                    plane_tiling: None,
                     multi_rows: true,
                     tile_matmul: TileMatmulKind::Mma,
                 })),
