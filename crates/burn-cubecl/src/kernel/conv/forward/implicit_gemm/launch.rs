@@ -6,7 +6,10 @@ use cubek::{
         AcceleratedTileKind, ConvAlgorithm, ConvolutionArgs, ConvolutionInputs, Strategy,
         components::ConvSetupError, launch_ref,
     },
-    matmul::definition::{MatmulElems, MatmulGlobalElems},
+    matmul::{
+        definition::{MatmulElems, MatmulGlobalElems},
+        multi_level::routines::PlaneTilingBlueprintOptions,
+    },
     std::InputBinding,
 };
 
@@ -32,6 +35,37 @@ pub fn conv_gemm_simple_sync<const N: usize>(
         &Strategy::Inferred {
             algorithm,
             tile_kind,
+        },
+        input,
+        weight,
+        bias,
+        options,
+    )
+}
+
+/// [`conv_gemm_simple_sync`] with `row_count` rows of planes and `partition_k` tiles along k per
+/// partition in place of the plane selector's own choice, for autotune to weigh.
+pub fn conv_gemm_simple_sync_tiled<const N: usize>(
+    input: CubeTensor,
+    weight: CubeTensor,
+    bias: Option<CubeTensor>,
+    options: ConvOptions<N>,
+    tile_kind: AcceleratedTileKind,
+    (row_count, partition_k): (u32, u32),
+) -> Result<CubeTensor, ConvSetupError> {
+    let algorithm = match tile_kind {
+        AcceleratedTileKind::Cmma => ConvAlgorithm::SimpleSyncCyclic,
+        AcceleratedTileKind::Mma => ConvAlgorithm::SimpleSyncStrided,
+    };
+    launch_convolution_forward::<N>(
+        &Strategy::InferredTiled {
+            algorithm,
+            tile_kind,
+            tiling: PlaneTilingBlueprintOptions {
+                row_count: Some(row_count),
+                partition_k: Some(partition_k),
+                ..Default::default()
+            },
         },
         input,
         weight,

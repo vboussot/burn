@@ -118,6 +118,88 @@ pub fn conv_autotune<const N: usize>(
                     conv_gemm_simple_sync(input, weight, bias, options, AcceleratedTileKind::Mma)
                 },
             ))
+            // Tilings the plane selector never picks for a convolution: it divides the cube's
+            // plane budget by a register-pressure factor of up to 8 and takes `plane_dim / tile_k`
+            // tiles along k, so a larger cube (8 or 16 rows of planes) with a deeper k partition (2
+            // or 4 tiles) is left untried. Autotune keeps them only where they measure faster.
+            .with(Tunable::new(
+                "simple_sync_cmma_rows16_k2",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (16, 2),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_cmma_rows8_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (8, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_cmma_rows16_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Cmma,
+                        (16, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows16_k2",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (16, 2),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows8_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (8, 4),
+                    )
+                },
+            ))
+            .with(Tunable::new(
+                "simple_sync_mma_rows16_k4",
+                |(input, weight, bias, options)| {
+                    conv_gemm_simple_sync_tiled(
+                        input,
+                        weight,
+                        bias,
+                        options,
+                        AcceleratedTileKind::Mma,
+                        (16, 4),
+                    )
+                },
+            ))
             .with(Tunable::new(
                 "simple_async_cmma",
                 |(input, weight, bias, options)| {

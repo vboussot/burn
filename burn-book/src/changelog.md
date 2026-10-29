@@ -79,6 +79,9 @@ positions when sequence lengths differ.
 
 #### Kernels
 
+- Weigh larger plane tiles (16 or 8 rows of planes, 2 or 4 tiles along k) in the CubeCL
+  convolution autotune, beside the tile the plane selector picks: half-precision 3D U-Nets run 3 to
+  5 % faster on CUDA. [@vboussot](https://github.com/vboussot)
 - Avoid a full-sized gradient copy in CubeCL FP32 `conv2d` bias backward, while retaining
   single-pass accumulation for FP16/BF16 to avoid intermediate overflow.
   ([#6173](https://github.com/tracel-ai/burn/pull/6173))
